@@ -11,26 +11,27 @@ module.exports = function (app, db) {
    *      tags:
    *          - Manage Txn
    *      summary: create new txn
-   *      parameters:
-   *          - in: body
-   *            schema:
-   *              type: object
-   *              required:
-   *                 - title
-   *                 - amount
-   *                 - category
-   *                 - date
-   *              properties:
-   *                  title:
-   *                      type: string
-   *                  amount:
-   *                      type: number
-   *                      format: double
-   *                  category:
-   *                      type: string
-   *                  date:
-   *                      type: string
-   *                      format: date
+   *      requestBody:
+   *          content:
+   *              application/json:
+   *                  schema:
+   *                      type: object
+   *                      required:
+   *                          - title
+   *                          - amount
+   *                          - category
+   *                          - date
+   *                      properties:
+   *                          title:
+   *                              type: string
+   *                          amount:
+   *                              type: number
+   *                              format: double
+   *                          category:
+   *                              type: string
+   *                          date:
+   *                              type: string
+   *                              format: date
    *      responses:
    *          '200':
    *              description: Txn added successfully
@@ -38,6 +39,7 @@ module.exports = function (app, db) {
    *              description: Internal server error
    *
    */
+
   app.post("/create", async (req, res) => {
     let uuid = uuidv4();
     let docRef = txns.doc(uuid);
@@ -84,7 +86,7 @@ module.exports = function (app, db) {
    *  get:
    *     tags:
    *        - Manage Txn
-   *     summary: get any txn by its id
+   *     summary: get any txn by id
    *     parameters:
    *      - name: id
    *        in: path
@@ -110,54 +112,54 @@ module.exports = function (app, db) {
     }
   });
 
-  //update txn
   /**
    * @swagger
-   * '/update/{id}':
-   *  put:
-   *     tags:
-   *        - Manage Txn
-   *     summary: update any txn by its id
-   *     parameters:
-   *      - in: path
-   *        name: id
-   *        description: The id of the txn
-   *        required: true
-   *        type: string
-   *      - name: body
-   *        in : body
-   *        required: true
-   *        schema:
-   *              type: object
-   *              required:
-   *                 - title
-   *                 - amount
-   *                 - category
-   *                 - date
-   *              properties:
-   *                  title:
-   *                      type: string
-   *                  amount:
-   *                      type: number
-   *                      format: double
-   *                  category:
-   *                      type: string
-   *                  date:
-   *                      type: string
-   *                      format: date
-   *     responses:
-   *      200:
-   *        description: Txn Updated Successfully
-   *      500:
-   *        description: Internal Server Error
+   * /update/{id}:
+   *   put:
+   *      description: Used to update Transaction
+   *      tags:
+   *          - Manage Txn
+   *      summary: update any txn by id
+   *      parameters:
+   *        - in: path
+   *          name: id
+   *          description: The id of the txn
+   *          required: true
+   *          type: string
+   *      requestBody:
+   *          content:
+   *              application/json:
+   *                  schema:
+   *                      type: object
+   *                      required:
+   *                          - title
+   *                          - amount
+   *                          - category
+   *                          - date
+   *                      properties:
+   *                          title:
+   *                              type: string
+   *                          amount:
+   *                              type: number
+   *                              format: double
+   *                          category:
+   *                              type: string
+   *                          date:
+   *                              type: string
+   *                              format: date
+   *      responses:
+   *          '200':
+   *              description: Txn added successfully
+   *          '500':
+   *              description: Internal server error
    *
    */
 
   app.put("/update/:id", async (req, res) => {
     const txnId = req.params.id;
-    console.log(txnId, req.body)
+    console.log(txnId, req.body);
     let docRef = txns.doc(txnId);
-    console.log(docRef)
+    console.log(docRef);
     await docRef.set({
       title: req.body.title,
       amount: req.body.amount,
