@@ -1,0 +1,20 @@
+{
+  "name": "budget-app",
+  "version": "1.0.0",
+  "description": "manage daily tranasction and create monthly bugets",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon server.js"
+  },
+  "author": "Shailendra Bhargava",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "express": "^4.19.2",
+    "firebase-admin": "^12.0.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
