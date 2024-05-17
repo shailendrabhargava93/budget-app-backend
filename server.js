@@ -1,7 +1,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const app = express();
-const port = 8000;
+const port = process.env.PORT || 8000;
 app.use(bodyParser.urlencoded({ extended: true }));
 
 //setup firebase
@@ -17,6 +17,6 @@ let db = admin.firestore();
 
 require("./app/routes")(app, db);
 
-app.listen(port, (req, res) => {
-  console.info(`Running on ${port}`);
-});
+app.listen(port, () => console.info(`Running on ${port}`));
+
+module.exports = app;
