@@ -43,7 +43,6 @@ module.exports = function (app, db) {
   app.post("/create", async (req, res) => {
     let uuid = uuidv4();
     let docRef = txns.doc(uuid);
-    console.info(req.body);
     await docRef.set({
       title: req.body.title,
       amount: req.body.amount,
@@ -157,9 +156,7 @@ module.exports = function (app, db) {
 
   app.put("/update/:id", async (req, res) => {
     const txnId = req.params.id;
-    console.log(txnId, req.body);
     let docRef = txns.doc(txnId);
-    console.log(docRef);
     await docRef.set({
       title: req.body.title,
       amount: req.body.amount,
