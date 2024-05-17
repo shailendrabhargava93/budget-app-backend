@@ -3,7 +3,41 @@ module.exports = function (app, db) {
   let txns = db.collection("transactions");
   const { v4: uuidv4 } = require("uuid");
 
-  //create txn
+  /**
+   * @swagger
+   * /create:
+   *   post:
+   *      description: Used to add Transaction
+   *      tags:
+   *          - Manage Txn
+   *      summary: create new txn
+   *      parameters:
+   *          - in: body
+   *            schema:
+   *              type: object
+   *              required:
+   *                 - title
+   *                 - amount
+   *                 - category
+   *                 - date
+   *              properties:
+   *                  title:
+   *                      type: string
+   *                  amount:
+   *                      type: number
+   *                      format: double
+   *                  category:
+   *                      type: string
+   *                  date:
+   *                      type: string
+   *                      format: date
+   *      responses:
+   *          '200':
+   *              description: Txn added successfully
+   *          '500':
+   *              description: Internal server error
+   *
+   */
   app.post("/create", async (req, res) => {
     let uuid = uuidv4();
     let docRef = txns.doc(uuid);
@@ -12,25 +46,59 @@ module.exports = function (app, db) {
       title: req.body.title,
       amount: req.body.amount,
       category: req.body.category,
-      date: req.body.date
+      date: req.body.date,
     });
     res.status(200).json("create success");
   });
 
   //get all txns
+  /**
+   * @swagger
+   * /getall:
+   *   get:
+   *      description: Used to Get All Transaction
+   *      tags:
+   *          - Manage Txn
+   *      summary: get all txns
+   *      responses:
+   *          '200':
+   *              description: Txn added successfully
+   *          '500':
+   *              description: Internal server error
+   *
+   */
   app.get("/getall", async (req, res) => {
     const txnRef = txns;
     const snapshot = await txnRef.get();
     var txnArray = [];
     snapshot.forEach((doc) => {
       txnArray.push({ id: doc.id, data: doc.data() });
-      console.log(doc.id, "=>", doc.data());
     });
     res.status(200).json(txnArray);
   });
 
-  //get one txn by id
-  app.get("/gettxn/:id", async (req, res) => {
+  //get any txn by id
+  /**
+   * @swagger
+   * '/txn/{id}':
+   *  get:
+   *     tags:
+   *        - Manage Txn
+   *     summary: get any txn by its id
+   *     parameters:
+   *      - name: id
+   *        in: path
+   *        description: The id of the txn
+   *        required: true
+   *        type: string
+   *     responses:
+   *      200:
+   *        description: Fetched Successfully
+   *      500:
+   *        description: Internal Server Error
+   */
+
+  app.get("/txn/:id", async (req, res) => {
     const txnId = req.params.id;
     const txnRef = txns.doc(txnId);
     const doc = await txnRef.get();
@@ -43,13 +111,58 @@ module.exports = function (app, db) {
   });
 
   //update txn
+  /**
+   * @swagger
+   * '/update/{id}':
+   *  put:
+   *     tags:
+   *        - Manage Txn
+   *     summary: update any txn by its id
+   *     parameters:
+   *      - in: path
+   *        name: id
+   *        description: The id of the txn
+   *        required: true
+   *        type: string
+   *      - name: body
+   *        in : body
+   *        required: true
+   *        schema:
+   *              type: object
+   *              required:
+   *                 - title
+   *                 - amount
+   *                 - category
+   *                 - date
+   *              properties:
+   *                  title:
+   *                      type: string
+   *                  amount:
+   *                      type: number
+   *                      format: double
+   *                  category:
+   *                      type: string
+   *                  date:
+   *                      type: string
+   *                      format: date
+   *     responses:
+   *      200:
+   *        description: Txn Updated Successfully
+   *      500:
+   *        description: Internal Server Error
+   *
+   */
+
   app.put("/update/:id", async (req, res) => {
     const txnId = req.params.id;
+    console.log(txnId, req.body)
     let docRef = txns.doc(txnId);
+    console.log(docRef)
     await docRef.set({
       title: req.body.title,
       amount: req.body.amount,
       category: req.body.category,
+      date: req.body.date,
     });
     res.send("update success");
   });
