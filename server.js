@@ -19,18 +19,26 @@ admin.initializeApp({
 //database reference
 let db = admin.firestore();
 
-const CSS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui.min.css';
+const CSS_URL =
+  "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui.min.css";
 const CUSTOM_JS = [
-      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-bundle.js',
-      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-standalone-preset.js',
-    ];
+  "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-bundle.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-standalone-preset.js",
+];
 
 // Serve Swagger documentation
-app.use("/api-docs", swaggerUI.serve, swaggerUI.setup(swaggerSpec, { customCssUrl: CSS_URL, customJs: CUSTOM_JS }));
+app.use(
+  "/api-docs",
+  swaggerUI.serve,
+  swaggerUI.setup(swaggerSpec, { customCssUrl: CSS_URL, customJs: CUSTOM_JS })
+);
 
 require("./app/routes")(app, db);
 
-app.get("/", () => res.send("App is running !!"));
+app.get("/", (req, res) => {
+  res.status(200);
+  res.json({ status: "OK", message: "App is Running !!" });
+});
 
 app.listen(port, () => console.info(`Running on ${port}`));
 
