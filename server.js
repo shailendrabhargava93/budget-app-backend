@@ -19,10 +19,14 @@ admin.initializeApp({
 //database reference
 let db = admin.firestore();
 
-const CSS_URL = "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.1.0/swagger-ui.min.css";
+const CSS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui.min.css';
+const CUSTOM_JS = [
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-bundle.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-standalone-preset.js',
+    ];
 
 // Serve Swagger documentation
-app.use("/api-docs", express.static('node_modules/swagger-ui-dist/', {index: false}), swaggerUI.serve, swaggerUI.setup(swaggerSpec, { customCssUrl: CSS_URL }));
+app.use("/api-docs", express.static('node_modules/swagger-ui-dist/', {index: false}), swaggerUI.serve, swaggerUI.setup(swaggerSpec, { customCssUrl: CSS_URL, customJs: CUSTOM_JS }));
 
 require("./app/routes")(app, db);
 
