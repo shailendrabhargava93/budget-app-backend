@@ -26,7 +26,7 @@ const CUSTOM_JS = [
     ];
 
 // Serve Swagger documentation
-app.use("/api-docs", express.static('node_modules/swagger-ui-dist/', {index: false}), swaggerUI.serve, swaggerUI.setup(swaggerSpec, { customCssUrl: CSS_URL, customJs: CUSTOM_JS }));
+app.use("/api-docs", swaggerUI.serve, swaggerUI.setup(swaggerSpec, { customCssUrl: CSS_URL, customJs: CUSTOM_JS }));
 
 require("./app/routes")(app, db);
 
