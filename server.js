@@ -1,7 +1,14 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const app = express();
+const cors = require("cors");
 const port = process.env.PORT || 8000;
+const corsOptions = {
+  origin: "http://localhost:4200",
+  credentials: true,
+  optionSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -37,7 +44,7 @@ require("./app/routes")(app, db);
 
 app.get("/", (req, res) => {
   res.status(200);
-  res.json({ status: "OK", message: "App is Running !!" });
+  res.json({ status: "OK", message: "Api is Running !!" });
 });
 
 app.listen(port, () => console.info(`Running on ${port}`));
