@@ -1,7 +1,6 @@
 module.exports = function (app, db) {
   //collection init
   let txns = db.collection("transactions");
-  let categories = db.collection("categories");
   let budgets = db.collection("budgets");
   const { v4: uuidv4 } = require("uuid");
 
@@ -50,6 +49,7 @@ module.exports = function (app, db) {
       amount: req.body.amount,
       category: req.body.category,
       date: req.body.date,
+      createdBy: req.body.createdBy 
     });
     res.status(200).json("create success");
   });
@@ -192,16 +192,21 @@ module.exports = function (app, db) {
     var txnArray = [];
     const txnRef = txns;
     const responseMessage = "No matching transaction found.";
-    if (req.query.createdBy !== null && req.query.createdBy !== "") {
-      const createdQUery = await txnRef
-        .where("createdBy", "==", req.query.createdBy)
+    if (req.query !== null && req.query !== "") {
+      const createdBy =
+        req.query.createdBy !== null && req.query.createdBy !== ""
+          ? req.query.createdBy
+          : null;
+
+      const queryOutput = await txnRef
+        .where("createdBy", "==", createdBy)
         .get();
-      if (createdQUery.empty) {
+      if (queryOutput.empty) {
         res.status(200).json(responseMessage);
         return;
       }
 
-      createdQUery.forEach((doc) => {
+      queryOutput.forEach((doc) => {
         txnArray.push({ id: doc.id, data: doc.data() });
       });
       res.status(200).json(txnArray);
@@ -212,12 +217,12 @@ module.exports = function (app, db) {
 
   /**
    * @swagger
-   * /getcategories:
+   * /budget/all:
    *   get:
-   *      description: Used to Get All Categories
+   *      description: Used to Get All Budgets
    *      tags:
-   *          - Manage Categories
-   *      summary: get all categories
+   *          - Manage Budgets
+   *      summary: get all budgets
    *      responses:
    *          '200':
    *              description: fetched successfully
@@ -225,9 +230,9 @@ module.exports = function (app, db) {
    *              description: Internal server error
    *
    */
-  app.get("/getcategories", async (req, res) => {
-    const categoryRef = categories;
-    const snapshot = await categoryRef.get();
+  app.get("/budget/all", async (req, res) => {
+    const budgetRef = budgets;
+    const snapshot = await budgetRef.get();
     var array = [];
     snapshot.forEach((doc) => {
       array.push({ id: doc.id, data: doc.data() });
@@ -276,7 +281,7 @@ module.exports = function (app, db) {
    *
    */
 
-  app.post("/create-budget", async (req, res) => {
+  app.post("/budget/create", async (req, res) => {
     let uuid = uuidv4();
     let ref = budgets.doc(uuid);
     await ref.set({
@@ -284,7 +289,7 @@ module.exports = function (app, db) {
       totalBudget: req.body.totalBudget,
       startDate: req.body.startDate,
       endDate: req.body.endDate,
-      users: [req.body.createdBy]
+      users: [req.body.createdBy],
     });
     res.status(200).json("create success");
   });
