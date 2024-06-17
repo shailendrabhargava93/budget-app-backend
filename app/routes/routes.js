@@ -57,7 +57,7 @@ module.exports = function (app, db) {
   //get all txns
   /**
    * @swagger
-   * /getall:
+   * /txn/all:
    *   get:
    *      description: Used to Get All Transaction
    *      tags:
@@ -70,7 +70,7 @@ module.exports = function (app, db) {
    *              description: Internal server error
    *
    */
-  app.get("/getall", async (req, res) => {
+  app.get("/txn/all", async (req, res) => {
     const txnRef = txns;
     const snapshot = await txnRef.get();
     var txnArray = [];
@@ -242,7 +242,7 @@ module.exports = function (app, db) {
 
   /**
    * @swagger
-   * /create-budget:
+   * /budget/create:
    *   post:
    *      description: Used to create budget
    *      tags:
