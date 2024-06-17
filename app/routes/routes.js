@@ -6,7 +6,7 @@ module.exports = function (app, db) {
 
   /**
    * @swagger
-   * /create:
+   * /txn/create:
    *   post:
    *      description: Used to add Transaction
    *      tags:
@@ -41,7 +41,7 @@ module.exports = function (app, db) {
    *
    */
 
-  app.post("/create", async (req, res) => {
+  app.post("/txn/create", async (req, res) => {
     let uuid = uuidv4();
     let docRef = txns.doc(uuid);
     await docRef.set({
@@ -49,7 +49,7 @@ module.exports = function (app, db) {
       amount: req.body.amount,
       category: req.body.category,
       date: req.body.date,
-      createdBy: req.body.createdBy 
+      createdBy: req.body.user 
     });
     res.status(200).json("create success");
   });
