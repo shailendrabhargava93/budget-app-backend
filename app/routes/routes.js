@@ -49,7 +49,7 @@ module.exports = function (app, db) {
       amount: req.body.amount,
       category: req.body.category,
       date: req.body.date,
-      createdBy: req.body.user 
+      createdBy: req.body.user,
     });
     res.status(200).json("create success");
   });
@@ -296,7 +296,7 @@ module.exports = function (app, db) {
 
   /**
    * @swagger
-   * /share/{id}/{email}:
+   * /budget/share/{id}/{email}:
    *   put:
    *      description: Used to share a budget
    *      tags:
@@ -321,7 +321,7 @@ module.exports = function (app, db) {
    *
    */
 
-  app.put("/share/:id/:email", async (req, res) => {
+  app.put("budget/share/:id/:email", async (req, res) => {
     const budgetId = req.params.id;
     const emailId = req.params.email;
     let budgetRef = budgets.doc(budgetId);
@@ -329,5 +329,44 @@ module.exports = function (app, db) {
       users: [emailId],
     });
     res.status(200).json("shared success");
+  });
+
+  /**
+   * @swagger
+   * /budget/find/{email}:
+   *   get:
+   *      description: Used to find any budgets for user
+   *      tags:
+   *          - Manage Budgets
+   *      summary: find any budgets
+   *      parameters:
+   *        - in: path
+   *          name: email
+   *          description: The email of the user
+   *          required: true
+   *          type: string
+   *      responses:
+   *          '200':
+   *              description: updated successfully
+   *          '500':
+   *              description: Internal server error
+   *
+   */
+  app.get("/budget/find/:email", async (req, res) => {
+    const budgetRef = budgets;
+    const emailId = req.params.email;
+    console.log(emailId);
+    let found = false;
+    const snapshot = await budgetRef.get();
+    var array = [];
+    snapshot.forEach((doc) => {
+      array = [...array, ...doc.data().users];
+    });
+    console.log(array);
+    if (array.includes(emailId)) {
+      found = true;
+    }
+    console.log(found);
+    res.status(200).json(found);
   });
 };
