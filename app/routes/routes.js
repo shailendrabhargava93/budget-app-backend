@@ -78,16 +78,16 @@ module.exports = function (app, db) {
 
   /**
    * @swagger
-   * /txn/all/{budgetId}:
+   * /txn/all/{email}:
    *  get:
    *     description: Used to Get All Transaction
    *     tags:
    *        - Manage Transactions
-   *     summary: get all txns for specific budget
+   *     summary: get all txns for specific user
    *     parameters:
-   *      - name: budgetId
+   *      - name: email
    *        in: path
-   *        description: id of the budget
+   *        description: email id of the user
    *        required: true
    *        type: string
    *     responses:
@@ -96,21 +96,37 @@ module.exports = function (app, db) {
    *      500:
    *        description: Internal Server Error
    */
-  app.get("/txn/all/:budgetId", async (req, res) => {
+  app.get("/txn/all/:email", async (req, res) => {
     var txnArray = [];
+    const budgetRef = budgets;
     const txnRef = txns;
-    const budgetId = req.params.budgetId;
+    const email = req.params.email;
 
-    if (budgetId) {
-      const queryOutput = await txnRef.where("budgetId", "==", budgetId).get();
+    if (email) {
+      const queryOutput = await budgetRef
+        .where("users", "array-contains", email)
+        .get();
+      const budgetIds = [];
       if (!queryOutput.empty) {
         queryOutput.forEach((doc) => {
+          budgetIds.push(doc.id);
+        });
+      }
+
+      const queryOutput2 = await txnRef
+        .where("budgetId", "in", budgetIds)
+        .get();
+      if (!queryOutput2.empty) {
+        queryOutput2.forEach((doc) => {
           txnArray.push({ id: doc.id, data: doc.data() });
         });
       }
+
+      console.log(txnArray);
+
       res.status(200).json(txnArray);
     } else {
-      res.status(200).json("Please provide valid parameters e.g budgetId");
+      res.status(200).json("Please provide valid parameters e.g email");
     }
   });
 
