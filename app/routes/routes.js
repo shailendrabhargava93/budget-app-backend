@@ -192,7 +192,7 @@ module.exports = function (app, db) {
   app.put("/update/:id", async (req, res) => {
     const txnId = req.params.id;
     let txnRef = txns.doc(txnId);
-    const res = await txnRef.update(
+    await txnRef.update(
       {
         title: req.body.title,
         amount: req.body.amount,
