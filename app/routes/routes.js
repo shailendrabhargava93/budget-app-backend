@@ -3,7 +3,7 @@ module.exports = function (app, db) {
   let txns = db.collection("transactions");
   let budgets = db.collection("budgets");
   const { v4: uuidv4 } = require("uuid");
-
+  const FieldValue = require("firebase-admin").firestore.FieldValue;
   /**
    * @swagger
    * /txn/create:
@@ -22,6 +22,8 @@ module.exports = function (app, db) {
    *                          - amount
    *                          - category
    *                          - date
+   *                          - budgetId
+   *                          - user
    *                      properties:
    *                          title:
    *                              type: string
@@ -33,6 +35,10 @@ module.exports = function (app, db) {
    *                          date:
    *                              type: string
    *                              format: date
+   *                          user:
+   *                              type: string
+   *                          budgetId:
+   *                              type: string
    *      responses:
    *          '200':
    *              description: Txn added successfully
@@ -43,44 +49,84 @@ module.exports = function (app, db) {
 
   app.post("/txn/create", async (req, res) => {
     let uuid = uuidv4();
-    let docRef = txns.doc(uuid);
-    await docRef.set({
-      title: req.body.title,
-      amount: req.body.amount,
-      category: req.body.category,
-      date: req.body.date,
-      createdBy: req.body.user,
-    });
-    res.status(200).json("create success");
+    let txnRef = txns.doc(uuid);
+
+    if (req.body.budgetId) {
+      const budgetId = req.body.budgetId;
+      console.log("budgetId : " + budgetId);
+      const budgetRef = budgets.doc(budgetId);
+
+      txnRef.set({
+        title: req.body.title,
+        amount: req.body.amount,
+        category: req.body.category,
+        date: req.body.date,
+        createdBy: req.body.user,
+        budgetId: req.body.budgetId,
+      });
+      const unionRes = await budgetRef.update(
+        {
+          transactions: FieldValue.arrayUnion(txnRef),
+        },
+        { merge: true }
+      );
+      res.status(200).json("create success");
+    } else {
+      res.status(200).json("Please provide valid parameters e.g budgetId");
+    }
   });
 
-  //get all txns
   /**
    * @swagger
-   * /txn/all:
-   *   get:
-   *      description: Used to Get All Transaction
-   *      tags:
-   *          - Manage Transactions
-   *      summary: get all txns
-   *      responses:
-   *          '200':
-   *              description: fetched successfully
-   *          '500':
-   *              description: Internal server error
-   *
+   * /txn/all/{budgetId}:
+   *  get:
+   *     description: Used to Get All Transaction
+   *     tags:
+   *        - Manage Transactions
+   *     summary: get all txns for specific budget
+   *     parameters:
+   *      - name: budgetId
+   *        in: path
+   *        description: id of the budget
+   *        required: true
+   *        type: string
+   *     responses:
+   *      200:
+   *        description: Fetched Successfully
+   *      500:
+   *        description: Internal Server Error
    */
-  app.get("/txn/all", async (req, res) => {
-    const txnRef = txns;
-    const snapshot = await txnRef.get();
+  app.get("/txn/all/:budgetId", async (req, res) => {
     var txnArray = [];
-    snapshot.forEach((doc) => {
-      txnArray.push({ id: doc.id, data: doc.data() });
-    });
-    res.status(200).json(txnArray);
+    const txnRef = txns;
+    const budgetId = req.params.budgetId;
+
+    if (budgetId) {
+      const queryOutput = await txnRef.where("budgetId", "==", budgetId).get();
+      if (!queryOutput.empty) {
+        queryOutput.forEach((doc) => {
+          txnArray.push({ id: doc.id, data: doc.data() });
+        });
+      }
+
+      const resultMap = new Map();
+      if (txnArray.length > 0) {
+        txnArray.forEach((item) => {
+          const date = new Date(item.data.date).toLocaleDateString("en-GB");
+          if (resultMap.has(date)) {
+            resultMap.get(date).push(item);
+          } else {
+            resultMap.set(date, [item]);
+          }
+        });
+      }
+      const resultObj = Object.fromEntries(resultMap);
+      res.status(200).json(resultObj);
+    } else {
+      res.status(200).json("Please provide valid parameters e.g budgetId");
+    }
   });
 
-  //get any txn by id
   /**
    * @swagger
    * '/txn/{id}':
@@ -215,28 +261,41 @@ module.exports = function (app, db) {
     }
   });
 
+  /**********BUDGET ENDPOINTS***************/
+
   /**
    * @swagger
-   * /budget/all:
+   * /budget/all/{email}:
    *   get:
-   *      description: Used to Get All Budgets
+   *      description: Used to find budgets for user
    *      tags:
    *          - Manage Budgets
-   *      summary: get all budgets
+   *      summary: get all budgets for user
+   *      parameters:
+   *        - in: path
+   *          name: email
+   *          description: The email of the user
+   *          required: true
+   *          type: string
    *      responses:
    *          '200':
-   *              description: fetched successfully
+   *              description: Fetched successfully
    *          '500':
    *              description: Internal server error
    *
    */
-  app.get("/budget/all", async (req, res) => {
-    const budgetRef = budgets;
-    const snapshot = await budgetRef.get();
+  app.get("/budget/all/:email", async (req, res) => {
     var array = [];
-    snapshot.forEach((doc) => {
-      array.push({ id: doc.id, data: doc.data() });
-    });
+    const budgetRef = budgets;
+    const email = req.params.email;
+    const queryOutput = await budgetRef
+      .where("users", "array-contains", email)
+      .get();
+    if (!queryOutput.empty) {
+      queryOutput.forEach((doc) => {
+        array.push({ id: doc.id, data: doc.data() });
+      });
+    }
     res.status(200).json(array);
   });
 
@@ -290,6 +349,7 @@ module.exports = function (app, db) {
       startDate: req.body.startDate,
       endDate: req.body.endDate,
       users: [req.body.createdBy],
+      transactions: [],
     });
     res.status(200).json("create success");
   });
@@ -321,52 +381,21 @@ module.exports = function (app, db) {
    *
    */
 
-  app.put("budget/share/:id/:email", async (req, res) => {
+  app.put("/budget/share/:id/:email", async (req, res) => {
     const budgetId = req.params.id;
-    const emailId = req.params.email;
-    let budgetRef = budgets.doc(budgetId);
-    await budgetRef.set({
-      users: [emailId],
-    });
-    res.status(200).json("shared success");
-  });
-
-  /**
-   * @swagger
-   * /budget/find/{email}:
-   *   get:
-   *      description: Used to find any budgets for user
-   *      tags:
-   *          - Manage Budgets
-   *      summary: find any budgets
-   *      parameters:
-   *        - in: path
-   *          name: email
-   *          description: The email of the user
-   *          required: true
-   *          type: string
-   *      responses:
-   *          '200':
-   *              description: updated successfully
-   *          '500':
-   *              description: Internal server error
-   *
-   */
-  app.get("/budget/find/:email", async (req, res) => {
-    const budgetRef = budgets;
-    const emailId = req.params.email;
-    console.log(emailId);
-    let found = false;
-    const snapshot = await budgetRef.get();
-    var array = [];
-    snapshot.forEach((doc) => {
-      array = [...array, ...doc.data().users];
-    });
-    console.log(array);
-    if (array.includes(emailId)) {
-      found = true;
+    const email = req.params.email;
+    if (email && budgetId) {
+      console.log(email);
+      const budgetRef = budgets.doc(budgetId);
+      const unionRes = await budgetRef.update(
+        {
+          users: FieldValue.arrayUnion(email),
+        },
+        { merge: true }
+      );
+      res.status(200).json("shared success");
+    } else {
+      res.status(200).json("Please provide valid parameters");
     }
-    console.log(found);
-    res.status(200).json(found);
   });
 };
