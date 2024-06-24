@@ -108,20 +108,7 @@ module.exports = function (app, db) {
           txnArray.push({ id: doc.id, data: doc.data() });
         });
       }
-
-      const resultMap = new Map();
-      if (txnArray.length > 0) {
-        txnArray.forEach((item) => {
-          const date = new Date(item.data.date).toLocaleDateString("en-GB");
-          if (resultMap.has(date)) {
-            resultMap.get(date).push(item);
-          } else {
-            resultMap.set(date, [item]);
-          }
-        });
-      }
-      const resultObj = Object.fromEntries(resultMap);
-      res.status(200).json(resultObj);
+      res.status(200).json(txnArray);
     } else {
       res.status(200).json("Please provide valid parameters e.g budgetId");
     }
@@ -204,13 +191,17 @@ module.exports = function (app, db) {
 
   app.put("/update/:id", async (req, res) => {
     const txnId = req.params.id;
-    let docRef = txns.doc(txnId);
-    await docRef.set({
-      title: req.body.title,
-      amount: req.body.amount,
-      category: req.body.category,
-      date: req.body.date,
-    });
+    let txnRef = txns.doc(txnId);
+    const res = await txnRef.update(
+      {
+        title: req.body.title,
+        amount: req.body.amount,
+        category: req.body.category,
+        date: req.body.date,
+      },
+      { merge: true }
+    );
+
     res.status(200).json("update success");
   });
 
