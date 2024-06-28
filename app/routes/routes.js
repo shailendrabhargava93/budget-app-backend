@@ -54,8 +54,6 @@ module.exports = function (app, db) {
     if (req.body.budgetId) {
       const budgetId = req.body.budgetId;
       console.log("budgetId : " + budgetId);
-      const budgetRef = budgets.doc(budgetId);
-
       txnRef.set({
         title: req.body.title,
         amount: req.body.amount,
@@ -64,12 +62,6 @@ module.exports = function (app, db) {
         createdBy: req.body.user,
         budgetId: req.body.budgetId,
       });
-      const unionRes = await budgetRef.update(
-        {
-          transactions: FieldValue.arrayUnion(txnRef),
-        },
-        { merge: true }
-      );
       res.status(200).json("create success");
     } else {
       res.status(200).json("Please provide valid parameters e.g budgetId");
@@ -121,9 +113,6 @@ module.exports = function (app, db) {
           txnArray.push({ id: doc.id, data: doc.data() });
         });
       }
-
-      console.log(txnArray);
-
       res.status(200).json(txnArray);
     } else {
       res.status(200).json("Please provide valid parameters e.g email");
@@ -294,14 +283,26 @@ module.exports = function (app, db) {
   app.get("/budget/all/:email", async (req, res) => {
     var array = [];
     const budgetRef = budgets;
+    const txnRef = txns;
     const email = req.params.email;
     const queryOutput = await budgetRef
       .where("users", "array-contains", email)
       .get();
     if (!queryOutput.empty) {
-      queryOutput.forEach((doc) => {
-        array.push({ id: doc.id, data: doc.data() });
-      });
+      for (let budget of queryOutput.docs) {
+        let spentAmount = 0;
+        const queryOutput2 = await txnRef
+          .where("budgetId", "==", budget.id)
+          .get();
+        if (!queryOutput2.empty) {
+          queryOutput2.forEach((txn) => {
+            spentAmount = spentAmount + txn.data().amount;
+          });
+        }
+        let budgetData = budget.data();
+        budgetData.spentAmount = spentAmount;
+        array.push({ id: budget.id, data: budgetData });
+      }
     }
     res.status(200).json(array);
   });
@@ -356,7 +357,6 @@ module.exports = function (app, db) {
       startDate: req.body.startDate,
       endDate: req.body.endDate,
       users: [req.body.createdBy],
-      transactions: [],
     });
     res.status(200).json("create success");
   });
