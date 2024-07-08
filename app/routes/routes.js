@@ -435,7 +435,7 @@ module.exports = function (app, db) {
    *
    */
 
-  app.put("/budget/update/:id", async (req, res) => {
+  app.put("/budget/update/:id/:status", async (req, res) => {
     const budgetId = req.params.id;
     const status = req.params.status;
     if (status && budgetId) {
