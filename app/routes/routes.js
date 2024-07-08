@@ -97,6 +97,7 @@ module.exports = function (app, db) {
     if (email) {
       const queryOutput = await budgetRef
         .where("users", "array-contains", email)
+        .where("status", "==", "active")
         .get();
       const budgetIds = [];
       if (!queryOutput.empty) {
@@ -327,6 +328,7 @@ module.exports = function (app, db) {
    *                          - startDate
    *                          - endDate
    *                          - createdBy
+   *                          - status
    *                      properties:
    *                          name:
    *                              type: string
@@ -340,6 +342,8 @@ module.exports = function (app, db) {
    *                              type: string
    *                              format: date
    *                          createdBy:
+   *                              type: string
+   *                          status:
    *                              type: string
    *      responses:
    *          '200':
@@ -358,7 +362,7 @@ module.exports = function (app, db) {
       startDate: req.body.startDate,
       endDate: req.body.endDate,
       users: [req.body.createdBy],
-      status: "active",
+      status: req.body.status,
     });
     res.status(200).json("create success");
   });
@@ -396,7 +400,7 @@ module.exports = function (app, db) {
     if (email && budgetId) {
       console.log(email);
       const budgetRef = budgets.doc(budgetId);
-      const unionRes = await budgetRef.update(
+      await budgetRef.update(
         {
           users: FieldValue.arrayUnion(email),
         },
@@ -441,12 +445,20 @@ module.exports = function (app, db) {
     if (status && budgetId) {
       console.log(status);
       const budgetRef = budgets.doc(budgetId);
-      const unionRes = await budgetRef.update(
-        {
-          status: status,
-        },
-        { merge: true }
-      );
+      if (status === "deleted") {
+        const doc = await txns.where("budgetId", "==", budgetId).get();
+        doc.forEach((element) => {
+          element.ref.delete();
+        });
+        budgetRef.delete();
+      } else if (status === "completed") {
+        await budgetRef.update(
+          {
+            status: status,
+          },
+          { merge: true }
+        );
+      }
       res.status(200).json("update success");
     } else {
       res.status(200).json("Please provide valid parameters");
