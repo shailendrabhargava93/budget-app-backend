@@ -287,6 +287,7 @@ module.exports = function (app, db) {
     const email = req.params.email;
     const queryOutput = await budgetRef
       .where("users", "array-contains", email)
+      .where("status", "==", "active")
       .get();
     if (!queryOutput.empty) {
       for (let budget of queryOutput.docs) {
@@ -357,6 +358,7 @@ module.exports = function (app, db) {
       startDate: req.body.startDate,
       endDate: req.body.endDate,
       users: [req.body.createdBy],
+      status: "active",
     });
     res.status(200).json("create success");
   });
@@ -401,6 +403,51 @@ module.exports = function (app, db) {
         { merge: true }
       );
       res.status(200).json("shared success");
+    } else {
+      res.status(200).json("Please provide valid parameters");
+    }
+  });
+
+  /**
+   * @swagger
+   * /budget/update/{id}:
+   *   put:
+   *      description: Used to update a budget
+   *      tags:
+   *          - Manage Budgets
+   *      summary: update budget
+   *      parameters:
+   *        - in: path
+   *          name: id
+   *          description: The id of the budget
+   *          required: true
+   *          type: string
+   *        - in: path
+   *          name: status
+   *          description: budget status
+   *          required: true
+   *          type: string
+   *      responses:
+   *          '200':
+   *              description: updated successfully
+   *          '500':
+   *              description: Internal server error
+   *
+   */
+
+  app.put("/budget/update/:id", async (req, res) => {
+    const budgetId = req.params.id;
+    const status = req.params.status;
+    if (status && budgetId) {
+      console.log(status);
+      const budgetRef = budgets.doc(budgetId);
+      const unionRes = await budgetRef.update(
+        {
+          status: status,
+        },
+        { merge: true }
+      );
+      res.status(200).json("update success");
     } else {
       res.status(200).json("Please provide valid parameters");
     }
