@@ -204,10 +204,11 @@ module.exports = function (app, db) {
         amount: req.body.amount,
         category: req.body.category,
         date: req.body.date,
+        createdBy: req.body.user,
+        budgetId: req.body.budgetId,
       },
       { merge: true }
     );
-
     res.status(200).json("update success");
   });
 
