@@ -154,7 +154,7 @@ module.exports = function (app, db) {
 
   /**
    * @swagger
-   * /update/{id}:
+   * /txn/update/{id}:
    *   put:
    *      description: Used to update Transaction
    *      tags:
@@ -195,7 +195,7 @@ module.exports = function (app, db) {
    *
    */
 
-  app.put("/update/:id", async (req, res) => {
+  app.put("/txn/update/:id", async (req, res) => {
     const txnId = req.params.id;
     let txnRef = txns.doc(txnId);
     await txnRef.update(
@@ -362,6 +362,7 @@ module.exports = function (app, db) {
       totalBudget: req.body.totalBudget,
       startDate: req.body.startDate,
       endDate: req.body.endDate,
+      createdBy: req.body.createdBy,
       users: [req.body.createdBy],
       status: req.body.status,
     });
