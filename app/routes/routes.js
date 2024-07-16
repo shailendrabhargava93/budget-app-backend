@@ -3,7 +3,6 @@ module.exports = function (app, db) {
   let txns = db.collection("transactions");
   let budgets = db.collection("budgets");
   const { v4: uuidv4 } = require("uuid");
-  const FieldValue = require("firebase-admin").firestore.FieldValue;
   /**
    * @swagger
    * /txn/create:
@@ -64,7 +63,7 @@ module.exports = function (app, db) {
       });
       res.status(200).json("create success");
     } else {
-      res.status(200).json("Please provide valid parameters e.g budgetId");
+      res.status(400).json("Please provide valid parameters e.g budgetId");
     }
   });
 
@@ -93,30 +92,35 @@ module.exports = function (app, db) {
     const budgetRef = budgets;
     const txnRef = txns;
     const email = req.params.email;
+    const snapshot = await budgetRef.get();
 
     if (email) {
-      const queryOutput = await budgetRef
-        .where("users", "array-contains", email)
-        .where("status", "==", "active")
-        .get();
-      const budgetIds = [];
-      if (!queryOutput.empty) {
-        queryOutput.forEach((doc) => {
-          budgetIds.push(doc.id);
-        });
-      }
+      if (!snapshot.empty) {
+        const queryOutput = await budgetRef
+          .where("users", "array-contains", email)
+          .where("status", "==", "active")
+          .get();
+        const budgetIds = [];
+        if (!queryOutput.empty) {
+          queryOutput.forEach((doc) => {
+            budgetIds.push(doc.id);
+          });
+        }
 
-      const queryOutput2 = await txnRef
-        .where("budgetId", "in", budgetIds)
-        .get();
-      if (!queryOutput2.empty) {
-        queryOutput2.forEach((doc) => {
-          txnArray.push({ id: doc.id, data: doc.data() });
-        });
+        const queryOutput2 = await txnRef
+          .where("budgetId", "in", budgetIds)
+          .get();
+        if (!queryOutput2.empty) {
+          queryOutput2.forEach((doc) => {
+            txnArray.push({ id: doc.id, data: doc.data() });
+          });
+        }
+        res.status(200).json(txnArray);
+      } else {
+        res.status(200).json(txnArray);
       }
-      res.status(200).json(txnArray);
     } else {
-      res.status(200).json("Please provide valid parameters e.g email");
+      res.status(400).json("Please provide valid parameters e.g email");
     }
   });
 
@@ -255,7 +259,7 @@ module.exports = function (app, db) {
       });
       res.status(200).json(txnArray);
     } else {
-      res.status(200).json("Please provide valid paramter");
+      res.status(400).json("Please provide valid paramter");
     }
   });
 
@@ -371,54 +375,9 @@ module.exports = function (app, db) {
 
   /**
    * @swagger
-   * /budget/share/{id}/{email}:
-   *   put:
-   *      description: Used to share a budget
-   *      tags:
-   *          - Manage Budgets
-   *      summary: share budget
-   *      parameters:
-   *        - in: path
-   *          name: id
-   *          description: The id of the budget
-   *          required: true
-   *          type: string
-   *        - in: path
-   *          name: email
-   *          description: The email id of the person
-   *          required: true
-   *          type: string
-   *      responses:
-   *          '200':
-   *              description: updated successfully
-   *          '500':
-   *              description: Internal server error
-   *
-   */
-
-  app.put("/budget/share/:id/:email", async (req, res) => {
-    const budgetId = req.params.id;
-    const email = req.params.email;
-    if (email && budgetId) {
-      console.log(email);
-      const budgetRef = budgets.doc(budgetId);
-      await budgetRef.update(
-        {
-          users: FieldValue.arrayUnion(email),
-        },
-        { merge: true }
-      );
-      res.status(200).json("shared success");
-    } else {
-      res.status(200).json("Please provide valid parameters");
-    }
-  });
-
-  /**
-   * @swagger
    * /budget/update/{id}:
    *   put:
-   *      description: Used to update a budget
+   *      description: Used to update Budget
    *      tags:
    *          - Manage Budgets
    *      summary: update budget
@@ -428,42 +387,71 @@ module.exports = function (app, db) {
    *          description: The id of the budget
    *          required: true
    *          type: string
-   *        - in: path
-   *          name: status
-   *          description: budget status
-   *          required: true
-   *          type: string
+   *      requestBody:
+   *          content:
+   *              application/json:
+   *                  schema:
+   *                      type: object
+   *                      required:
+   *                          - name
+   *                          - totalBudget
+   *                          - startDate
+   *                          - endDate
+   *                          - status
+   *                          - users
+   *                      properties:
+   *                          name:
+   *                              type: string
+   *                          totalBudget:
+   *                              type: number
+   *                              format: double
+   *                          status:
+   *                              type: string
+   *                          startDate:
+   *                              type: string
+   *                              format: date
+   *                          endDate:
+   *                              type: string
+   *                              format: date
+   *                          users:
+   *                              type: array
+   *                              items:
+   *                                type: string
    *      responses:
    *          '200':
-   *              description: updated successfully
+   *              description: budget updated successfully
    *          '500':
    *              description: Internal server error
    *
    */
 
-  app.put("/budget/update/:id/:status", async (req, res) => {
+  app.put("/budget/update/:id", async (req, res) => {
     const budgetId = req.params.id;
-    const status = req.params.status;
-    if (status && budgetId) {
-      console.log(status);
+    if (budgetId) {
       const budgetRef = budgets.doc(budgetId);
-      if (status === "deleted") {
-        const doc = await txns.where("budgetId", "==", budgetId).get();
-        doc.forEach((element) => {
-          element.ref.delete();
-        });
-        budgetRef.delete();
-      } else if (status === "completed") {
+      const doc = await budgetRef.get();
+      console.log(doc.data());
+      if (doc.exists) {
         await budgetRef.update(
           {
-            status: status,
+            name: req.body.name ? req.body.name : doc.data().name,
+            totalBudget: req.body.totalBudget
+              ? req.body.totalBudget
+              : doc.data().totalBudget,
+            startDate: req.body.startDate
+              ? req.body.startDate
+              : doc.data().startDate,
+            endDate: req.body.endDate ? req.body.endDate : doc.data().endDate,
+            status: req.body.status ? req.body.status : doc.data().status,
+            users: req.body.users ? req.body.users : doc.data().users,
+            createdBy: doc.data().createdBy,
           },
           { merge: true }
         );
       }
       res.status(200).json("update success");
     } else {
-      res.status(200).json("Please provide valid parameters");
+      res.status(400).json("Please provide valid parameters");
     }
   });
 };
