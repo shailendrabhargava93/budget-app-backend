@@ -51,8 +51,6 @@ module.exports = function (app, db) {
     let txnRef = txns.doc(uuid);
 
     if (req.body.budgetId) {
-      const budgetId = req.body.budgetId;
-      console.log("budgetId : " + budgetId);
       txnRef.set({
         title: req.body.title,
         amount: req.body.amount,
@@ -69,7 +67,7 @@ module.exports = function (app, db) {
 
   /**
    * @swagger
-   * /txn/all/{email}:
+   * /txn/all/{email}/{page}:
    *  get:
    *     description: Used to Get All Transaction
    *     tags:
@@ -81,17 +79,23 @@ module.exports = function (app, db) {
    *        description: email id of the user
    *        required: true
    *        type: string
+   *      - name: page
+   *        in: path
+   *        description: page no
+   *        required: true
+   *        type: number
    *     responses:
    *      200:
    *        description: Fetched Successfully
    *      500:
    *        description: Internal Server Error
    */
-  app.get("/txn/all/:email", async (req, res) => {
+  app.get("/txn/all/:email/:page", async (req, res) => {
     var txnArray = [];
     const budgetRef = budgets;
     const txnRef = txns;
     const email = req.params.email;
+    const page = req.params.page;
     const snapshot = await budgetRef.get();
 
     if (email) {
@@ -107,9 +111,24 @@ module.exports = function (app, db) {
           });
         }
 
-        const queryOutput2 = await txnRef
+        const firstRow = await txnRef
           .where("budgetId", "in", budgetIds)
-          .get();
+          .orderBy("date", "desc")
+          .limit(10);
+
+        const snapshot = await firstRow.get();
+
+        // Get the last document
+        const lastElement = snapshot.docs[snapshot.docs.length - 1];
+
+        const next = await txnRef
+          .where("budgetId", "in", budgetIds)
+          .orderBy("date", "desc")
+          .startAfter(lastElement.data().date)
+          .limit(10);
+
+        const queryOutput2 = page > 1 ? await next.get() : await firstRow.get();
+
         if (!queryOutput2.empty) {
           queryOutput2.forEach((doc) => {
             txnArray.push({ id: doc.id, data: doc.data() });
@@ -452,6 +471,38 @@ module.exports = function (app, db) {
       res.status(200).json("update success");
     } else {
       res.status(400).json("Please provide valid parameters");
+    }
+  });
+
+  /**
+   * @swagger
+   * '/budget/{id}':
+   *  get:
+   *     tags:
+   *        - Manage Budgets
+   *     summary: get any budget by id
+   *     parameters:
+   *      - name: id
+   *        in: path
+   *        description: The id of the budget
+   *        required: true
+   *        type: string
+   *     responses:
+   *      200:
+   *        description: Fetched Successfully
+   *      500:
+   *        description: Internal Server Error
+   */
+
+  app.get("/budget/:id", async (req, res) => {
+    const budgetId = req.params.id;
+    const budgetRef = budgets.doc(budgetId);
+    const doc = await budgetRef.get();
+    if (!doc.exists) {
+      res.status(200).json("No such budget found!");
+    } else {
+      console.log("txn data:", doc.data());
+      res.status(200).json(doc.data());
     }
   });
 };
