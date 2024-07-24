@@ -502,7 +502,7 @@ module.exports = function (app, db) {
       res.status(200).json("No such budget found!");
     } else {
       let spentAmount = 0;
-      const queryOutput2 = await txnRef.where("budgetId", "==", doc.id).get();
+      const queryOutput2 = await txns.where("budgetId", "==", doc.id).get();
       if (!queryOutput2.empty) {
         queryOutput2.forEach((txn) => {
           spentAmount = spentAmount + txn.data().amount;
