@@ -501,8 +501,16 @@ module.exports = function (app, db) {
     if (!doc.exists) {
       res.status(200).json("No such budget found!");
     } else {
-      console.log("txn data:", doc.data());
-      res.status(200).json(doc.data());
+      let spentAmount = 0;
+      const queryOutput2 = await txnRef.where("budgetId", "==", doc.id).get();
+      if (!queryOutput2.empty) {
+        queryOutput2.forEach((txn) => {
+          spentAmount = spentAmount + txn.data().amount;
+        });
+      }
+      let budgetData = doc.data();
+      budgetData.spentAmount = spentAmount;
+      res.status(200).json(budgetData);
     }
   });
 };
