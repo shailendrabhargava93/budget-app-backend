@@ -67,7 +67,7 @@ module.exports = function (app, db) {
 
   /**
    * @swagger
-   * /txn/all/{email}/{page}:
+   * /txn/all/{email}/{page}/{count}:
    *  get:
    *     description: Used to Get All Transaction
    *     tags:
@@ -84,18 +84,24 @@ module.exports = function (app, db) {
    *        description: page no
    *        required: true
    *        type: number
+   *      - name: count
+   *        in: path
+   *        description: no of records
+   *        required: true
+   *        type: number
    *     responses:
    *      200:
    *        description: Fetched Successfully
    *      500:
    *        description: Internal Server Error
    */
-  app.get("/txn/all/:email/:page", async (req, res) => {
+  app.get("/txn/all/:email/:page/:count", async (req, res) => {
     var txnArray = [];
     const budgetRef = budgets;
     const txnRef = txns;
     const email = req.params.email;
     const page = req.params.page;
+    const count = req.params.count ? Number(req.params.count) : 10;
     const snapshot = await budgetRef.get();
 
     if (email) {
@@ -114,7 +120,7 @@ module.exports = function (app, db) {
         const firstRow = await txnRef
           .where("budgetId", "in", budgetIds)
           .orderBy("date", "desc")
-          .limit(10);
+          .limit(count);
 
         const snapshot = await firstRow.get();
 
@@ -125,7 +131,7 @@ module.exports = function (app, db) {
           .where("budgetId", "in", budgetIds)
           .orderBy("date", "desc")
           .startAfter(lastElement.data().date)
-          .limit(10);
+          .limit(count);
 
         const queryOutput2 = page > 1 ? await next.get() : await firstRow.get();
 
@@ -511,6 +517,82 @@ module.exports = function (app, db) {
       let budgetData = doc.data();
       budgetData.spentAmount = spentAmount;
       res.status(200).json(budgetData);
+    }
+  });
+
+  /**
+   * @swagger
+   * '/budget/stats/{id}':
+   *  get:
+   *     tags:
+   *        - Manage Budgets
+   *     summary: get budget stats
+   *     parameters:
+   *      - name: id
+   *        in: path
+   *        description: The id of the budget
+   *        required: true
+   *        type: string
+   *     responses:
+   *      200:
+   *        description: Fetched Successfully
+   *      500:
+   *        description: Internal Server Error
+   */
+
+  app.get("/budget/stats/:id", async (req, res) => {
+    const budgetId = req.params.id;
+    const budgetRef = budgets.doc(budgetId);
+    const doc = await budgetRef.get();
+    if (!doc.exists) {
+      res.status(200).json("No such budget found!");
+    } else {
+      let txnList = [];
+      const queryOutput2 = await txns.where("budgetId", "==", doc.id).get();
+      if (!queryOutput2.empty) {
+        queryOutput2.forEach((txn) => {
+          txnList.push(txn.data());
+        });
+      }
+
+      let result;
+      if (txnList.length > 0) {
+        const categorySum = {};
+
+        for (const transaction of txnList) {
+          const category = transaction.category;
+          const amount = transaction.amount;
+
+          if (category in categorySum) {
+            categorySum[category] += amount;
+          } else {
+            categorySum[category] = amount;
+          }
+        }
+
+        const dateSum = {};
+
+        for (const transaction of txnList) {
+          const date = new Date(transaction.date);
+          const moddate = date.toISOString().split("T")[0];
+          const amount = transaction.amount;
+
+          if (moddate in dateSum) {
+            dateSum[moddate] += amount;
+          } else {
+            dateSum[moddate] = amount;
+          }
+        }
+
+        const sortedKeys = Object.keys(dateSum).sort();
+        let sortedData = {};
+        for (let key of sortedKeys) {
+          sortedData[key] = dateSum[key];
+        }
+
+        result = { categoryData: categorySum, datesData: sortedData };
+      }
+      res.status(200).json(result);
     }
   });
 };
