@@ -557,16 +557,20 @@ module.exports = function (app, db) {
 
       let result;
       if (txnList.length > 0) {
-        const categorySum = {};
+        const categoryTxnCount = {};
 
+        let count = 1;
         for (const transaction of txnList) {
           const category = transaction.category;
           const amount = transaction.amount;
 
-          if (category in categorySum) {
-            categorySum[category] += amount;
+          if (category in categoryTxnCount) {
+            categoryTxnCount[category] = {
+              sumAmount: categoryTxnCount[category].sumAmount + amount,
+              count: categoryTxnCount[category].count + 1,
+            };
           } else {
-            categorySum[category] = amount;
+            categoryTxnCount[category] = { sumAmount: amount, count: count };
           }
         }
 
@@ -590,7 +594,10 @@ module.exports = function (app, db) {
           sortedData[key] = dateSum[key];
         }
 
-        result = { categoryData: categorySum, datesData: sortedData };
+        result = {
+          datesData: sortedData,
+          categoryTxnCount: categoryTxnCount,
+        };
       }
       res.status(200).json(result);
     }
