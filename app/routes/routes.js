@@ -97,6 +97,7 @@ module.exports = function (app, db) {
    */
   app.get("/txn/all/:email/:page/:count", async (req, res) => {
     var txnArray = [];
+    let result = { txns: txnArray, highestAmount: 0 };
     const budgetRef = budgets;
     const txnRef = txns;
     const email = req.params.email;
@@ -139,10 +140,16 @@ module.exports = function (app, db) {
           queryOutput2.forEach((doc) => {
             txnArray.push({ id: doc.id, data: doc.data() });
           });
+
+          let highestAmount = Math.max(
+            ...this.txnArray.map((transaction) => transaction.data.amount)
+          );
+
+          result = { txns: txnArray, highestAmount: highestAmount };
         }
-        res.status(200).json(txnArray);
+        res.status(200).json(result);
       } else {
-        res.status(200).json(txnArray);
+        res.status(200).json(result);
       }
     } else {
       res.status(400).json("Please provide valid parameters e.g email");
