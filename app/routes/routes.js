@@ -149,6 +149,89 @@ module.exports = function (app, db) {
     }
   });
 
+  //filter
+  /**
+   * @swagger
+   * /txn/filter:
+   *   post:
+   *      description: filter all transactions
+   *      tags:
+   *          - Manage Transactions
+   *      summary: Filter Txns
+   *      requestBody:
+   *          content:
+   *              application/json:
+   *                  schema:
+   *                      type: object
+   *                      required:
+   *                          - email
+   *                          - categories
+   *                          - min
+   *                          - max
+   *                      properties:
+   *                          email:
+   *                              type: string
+   *                          min:
+   *                              type: number
+   *                              format: double
+   *                          max:
+   *                              type: number
+   *                              format: double
+   *                          categories:
+   *                              type: array
+   *                              items:
+   *                                type: string
+   *      responses:
+   *          '200':
+   *              description: Fetched successfully
+   *          '500':
+   *              description: Internal server error
+   *
+   */
+  app.post("/txn/filter", async (req, res) => {
+    var txnArray = [];
+    const budgetRef = budgets;
+    const txnRef = txns;
+    const email = req.body.email;
+    const categories = req.body.categories;
+    const min = req.body.min;
+    const max = req.body.max;
+
+    const snapshot = await budgetRef.get();
+
+    if (email) {
+      if (!snapshot.empty) {
+        const queryOutput = await budgetRef
+          .where("users", "array-contains", email)
+          .where("status", "==", "active")
+          .get();
+        const budgetIds = [];
+        if (!queryOutput.empty) {
+          queryOutput.forEach((doc) => {
+            budgetIds.push(doc.id);
+          });
+        }
+        const queryOutput2 = await txnRef
+          .where("budgetId", "in", budgetIds)
+          .where("category", "in", categories)
+          .where("amount", ">=", Number(min))
+          .where("amount", "<=", Number(max))
+          .get();
+
+        if (!queryOutput2.empty) {
+          queryOutput2.forEach((doc) => {
+            txnArray.push({ id: doc.id, data: doc.data() });
+          });
+        }
+        res.status(200).json(txnArray);
+      } else {
+        res.status(200).json(txnArray);
+      }
+    } else {
+      res.status(400).json("Please provide valid parameters e.g email");
+    }
+  });
+
   /**
    * @swagger
    * '/txn/{id}':
@@ -292,7 +375,7 @@ module.exports = function (app, db) {
 
   /**
    * @swagger
-   * /budget/all/{email}:
+   * /budget/all/{email}/{status}:
    *   get:
    *      description: Used to find budgets for user
    *      tags:
@@ -304,6 +387,11 @@ module.exports = function (app, db) {
    *          description: The email of the user
    *          required: true
    *          type: string
+   *        - in: path
+   *          name: status
+   *          description: status of budget
+   *          required: true
+   *          type: string
    *      responses:
    *          '200':
    *              description: Fetched successfully
@@ -311,14 +399,15 @@ module.exports = function (app, db) {
    *              description: Internal server error
    *
    */
-  app.get("/budget/all/:email", async (req, res) => {
+  app.get("/budget/all/:email/:status", async (req, res) => {
     var array = [];
     const budgetRef = budgets;
     const txnRef = txns;
     const email = req.params.email;
+    const status = req.params.status;
     const queryOutput = await budgetRef
       .where("users", "array-contains", email)
-      .where("status", "==", "active")
+      .where("status", "==", status)
       .get();
     if (!queryOutput.empty) {
       for (let budget of queryOutput.docs) {
