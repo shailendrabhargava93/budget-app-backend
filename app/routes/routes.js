@@ -96,7 +96,8 @@ module.exports = function (app, db) {
    *        description: Internal Server Error
    */
   app.get("/txn/all/:email/:page/:count", async (req, res) => {
-    var txnArray = [];
+    let txnArray = [];
+    let max;
     const budgetRef = budgets;
     const txnRef = txns;
     const email = req.params.email;
@@ -115,6 +116,16 @@ module.exports = function (app, db) {
           queryOutput.forEach((doc) => {
             budgetIds.push(doc.id);
           });
+        }
+
+        const maxRef = await txnRef
+          .where("budgetId", "in", budgetIds)
+          .orderBy("amount", "desc")
+          .limit(1)
+          .get();
+        if (!maxRef.empty) {
+          const dataRef = maxRef.docs ? maxRef.docs[0] : null;
+          max = dataRef.data().amount;
         }
 
         const firstRow = await txnRef
@@ -140,7 +151,7 @@ module.exports = function (app, db) {
             txnArray.push({ id: doc.id, data: doc.data() });
           });
         }
-        res.status(200).json(txnArray);
+        res.status(200).json({ txns: txnArray, max: max });
       } else {
         res.status(200).json(txnArray);
       }
