@@ -211,13 +211,20 @@ module.exports = function (app, db) {
             budgetIds.push(doc.id);
           });
         }
-        const queryOutput2 = await txnRef
-          .where("budgetId", "in", budgetIds)
-          .where("category", "in", categories)
-          .where("amount", ">=", Number(min))
-          .where("amount", "<=", Number(max))
-          .get();
 
+        let query = txnRef.where("budgetId", "in", budgetIds);
+
+        if (categories && categories.length > 0) {
+          query = query.where("category", "in", categories);
+        }
+        if (min) {
+          query = query.where("amount", ">=", Number(min));
+        }
+        if (max) {
+          query = query.where("amount", "<=", Number(max));
+        }
+
+        const queryOutput2 = await query.get();
         if (!queryOutput2.empty) {
           queryOutput2.forEach((doc) => {
             txnArray.push({ id: doc.id, data: doc.data() });
