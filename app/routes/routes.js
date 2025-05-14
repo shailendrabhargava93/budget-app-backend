@@ -2,6 +2,7 @@ module.exports = function (app, db) {
   //collection init
   let txns = db.collection("transactions");
   let budgets = db.collection("budgets");
+  let labels = db.collection("labels");
   const { v4: uuidv4 } = require("uuid");
   /**
    * @swagger
@@ -58,6 +59,7 @@ module.exports = function (app, db) {
         date: req.body.date,
         createdBy: req.body.user,
         budgetId: req.body.budgetId,
+        label: req.body.label,
       });
       res.status(200).json("create success");
     } else {
@@ -336,6 +338,7 @@ module.exports = function (app, db) {
         date: req.body.date,
         createdBy: req.body.user,
         budgetId: req.body.budgetId,
+        label: req.body.label
       },
       { merge: true }
     );
@@ -665,11 +668,13 @@ module.exports = function (app, db) {
       let result;
       if (txnList.length > 0) {
         const categoryTxnCount = {};
+        const labelTxnCount = {};
 
         let count = 1;
         for (const transaction of txnList) {
           const category = transaction.category;
           const amount = transaction.amount;
+          const label = transaction.label;
 
           if (category in categoryTxnCount) {
             categoryTxnCount[category] = {
@@ -678,6 +683,15 @@ module.exports = function (app, db) {
             };
           } else {
             categoryTxnCount[category] = { sumAmount: amount, count: count };
+          }
+
+          if (label in labelTxnCount) {
+            labelTxnCount[label] = {
+              sumAmount: labelTxnCount[label].sumAmount + amount,
+              count: labelTxnCount[label].count + 1,
+            };
+          } else {
+            labelTxnCount[label] = { sumAmount: amount, count: count };
           }
         }
 
@@ -704,9 +718,47 @@ module.exports = function (app, db) {
         result = {
           datesData: sortedData,
           categoryTxnCount: categoryTxnCount,
+          labelTxnCount: labelTxnCount
         };
       }
       res.status(200).json(result);
     }
+  });
+
+  //  LABELS
+  /**
+   * @swagger
+   * /label/all/{email}:
+   *   get:
+   *      description: Used to find labels for user
+   *      tags:
+   *          - Manage Labels
+   *      summary: get all labels for user
+   *      parameters:
+   *        - in: path
+   *          name: email
+   *          description: The email of the user
+   *          required: true
+   *          type: string
+   *      responses:
+   *          '200':
+   *              description: Fetched successfully
+   *          '500':
+   *              description: Internal server error
+   *
+   */
+  app.get("/label/all/:email", async (req, res) => {
+    var array = [];
+    const labelsRef = labels;
+    const email = req.params.email;
+    const queryOutput = await labelsRef
+      .where("users", "array-contains", email)
+      .get();
+    if (!queryOutput.empty) {
+      for (let label of queryOutput.docs) {
+        array = label.data().tags != null ? label.data().tags: [];
+      }
+    }
+    res.status(200).json(array);
   });
 };
