@@ -3,6 +3,7 @@ module.exports = function (app, db) {
   let txns = db.collection("transactions");
   let budgets = db.collection("budgets");
   let labels = db.collection("labels");
+  const moment = require('moment');
   const { v4: uuidv4 } = require("uuid");
   /**
    * @swagger
@@ -98,67 +99,69 @@ module.exports = function (app, db) {
    *        description: Internal Server Error
    */
   app.get("/txn/all/:email/:page/:count", async (req, res) => {
-    let txnArray = [];
-    let max;
-    const budgetRef = budgets;
-    const txnRef = txns;
-    const email = req.params.email;
-    const page = req.params.page;
-    const count = req.params.count ? Number(req.params.count) : 10;
-    const snapshot = await budgetRef.get();
-
-    if (email) {
-      if (!snapshot.empty) {
-        const queryOutput = await budgetRef
-          .where("users", "array-contains", email)
-          .where("status", "==", "active")
-          .get();
-        const budgetIds = [];
-        if (!queryOutput.empty) {
-          queryOutput.forEach((doc) => {
-            budgetIds.push(doc.id);
-          });
+    try {
+      const { email, page, count = 10 } = req.params;
+      if (!email) {
+        return res.status(400).json("Please provide valid parameters e.g email");
+      }
+  
+      const budgetRef = budgets;
+      const txnRef = txns;
+  
+      // Get budget IDs
+      const queryOutput = await budgetRef
+        .where("users", "array-contains", email)
+        .where("status", "==", "active")
+        .get();
+  
+      if (queryOutput.empty) {
+        return res.status(200).json({ txns: [], max: null, count: 0 });
+      }
+  
+      const budgetIds = queryOutput.docs.map((doc) => doc.id);
+  
+      // Get max transaction amount
+      const maxRef = await txnRef
+        .where("budgetId", "in", budgetIds)
+        .orderBy("amount", "desc")
+        .limit(1)
+        .get();
+  
+      const max = maxRef.empty ? null : maxRef.docs[0].data().amount;
+  
+      // Get total transaction count
+      const countRef = await txnRef.where("budgetId", "in", budgetIds).count().get();
+      const totalCount = countRef.data().count;
+  
+      // Get transactions
+      const txnQuery = txnRef
+        .where("budgetId", "in", budgetIds)
+        .orderBy("date", "desc")
+        .limit(Number(count));
+  
+      let queryOutput2;
+      if (page > 1) {
+        const firstSnapshot = await txnQuery.get();
+        if (firstSnapshot.empty) {
+          return res.status(200).json({ txns: [], max, count: totalCount });
         }
-
-        const maxRef = await txnRef
-          .where("budgetId", "in", budgetIds)
-          .orderBy("amount", "desc")
-          .limit(1)
-          .get();
-        if (!maxRef.empty) {
-          const dataRef = maxRef.docs ? maxRef.docs[0] : null;
-          max = dataRef.data().amount;
-        }
-
-        const firstRow = await txnRef
-          .where("budgetId", "in", budgetIds)
-          .orderBy("date", "desc")
-          .limit(count);
-
-        const snapshot = await firstRow.get();
-
-        // Get the last document
-        const lastElement = snapshot.docs[snapshot.docs.length - 1];
-
-        const next = await txnRef
+        const lastElement = firstSnapshot.docs[firstSnapshot.docs.length - 1];
+        queryOutput2 = await txnRef
           .where("budgetId", "in", budgetIds)
           .orderBy("date", "desc")
           .startAfter(lastElement.data().date)
-          .limit(count);
-
-        const queryOutput2 = page > 1 ? await next.get() : await firstRow.get();
-
-        if (!queryOutput2.empty) {
-          queryOutput2.forEach((doc) => {
-            txnArray.push({ id: doc.id, data: doc.data() });
-          });
-        }
-        res.status(200).json({ txns: txnArray, max: max });
+          .limit(Number(count))
+          .get();
       } else {
-        res.status(200).json(txnArray);
+        queryOutput2 = await txnQuery.get();
       }
-    } else {
-      res.status(400).json("Please provide valid parameters e.g email");
+  
+      const txnArray = queryOutput2.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
+  
+      res.status(200).json({ txns: txnArray, max, count: totalCount });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Internal Server Error" });
     }
   });
 
@@ -347,15 +350,15 @@ module.exports = function (app, db) {
 
   /**
    * @swagger
-   * '/txn':
+   * '/txn/spent/{email}':
    *  get:
    *     tags:
    *        - Manage Transactions
-   *     summary: get all txns by created by
+   *     summary: get spent by user
    *     parameters:
-   *      - name: createdBy
-   *        in: query
-   *        description: any created by person
+   *      - name: email
+   *        in: path
+   *        description: user email id
    *        required: true
    *        type: string
    *     responses:
@@ -365,31 +368,56 @@ module.exports = function (app, db) {
    *        description: Internal Server Error
    */
 
-  app.get("/txn", async (req, res) => {
-    var txnArray = [];
+  app.get("/txn/spent/:email", async (req, res) => {
     const txnRef = txns;
     const responseMessage = "No matching transaction found.";
-    if (req.query !== null && req.query !== "") {
-      const createdBy =
-        req.query.createdBy !== null && req.query.createdBy !== ""
-          ? req.query.createdBy
-          : null;
-
-      const queryOutput = await txnRef
-        .where("createdBy", "==", createdBy)
-        .get();
-      if (queryOutput.empty) {
-        res.status(200).json(responseMessage);
-        return;
-      }
-
-      queryOutput.forEach((doc) => {
-        txnArray.push({ id: doc.id, data: doc.data() });
-      });
-      res.status(200).json(txnArray);
-    } else {
-      res.status(400).json("Please provide valid paramter");
+    const email = req.params.email;
+  
+    if (!email || email === "") {
+      res.status(400).json("Please provide a valid 'email' parameter");
+      return;
     }
+  
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0); // Start of today
+  
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999); // End of today
+  
+    const weekStart = getStartOfWeek(new Date());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999); // End of the week
+  
+    const queryOutput = await txnRef.where("createdBy", "==", email).get();
+  
+    if (queryOutput.empty) {
+      res.status(200).json(responseMessage);
+      return;
+    }
+  
+    let totalAmountToday = 0;
+    let totalAmountThisWeek = 0;
+  
+    queryOutput.forEach((doc) => {
+      const txnData = doc.data();
+      const txnDate = new Date(txnData.date);
+    
+      if (txnDate >= todayStart && txnDate <= todayEnd) {
+        totalAmountToday += txnData.amount;
+      }
+  
+      if (txnDate >= weekStart && txnDate <= weekEnd) {
+        totalAmountThisWeek += txnData.amount;
+      }
+    });
+  
+    const response = {
+      totalAmountToday,
+      totalAmountThisWeek,
+    };
+  
+    res.status(200).json(response);
   });
 
   /**********BUDGET ENDPOINTS***************/
@@ -762,3 +790,12 @@ module.exports = function (app, db) {
     res.status(200).json(array);
   });
 };
+
+// Helper function to get start of the week
+function getStartOfWeek(date) {
+  const day = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+  const weekStart = new Date(date.setDate(diff));
+  weekStart.setHours(0, 0, 0, 0); // Start of the day
+  return weekStart;
+}
