@@ -3,7 +3,6 @@ module.exports = function (app, db) {
   let txns = db.collection("transactions");
   let budgets = db.collection("budgets");
   let labels = db.collection("labels");
-  const moment = require('moment');
   const { v4: uuidv4 } = require("uuid");
   /**
    * @swagger
