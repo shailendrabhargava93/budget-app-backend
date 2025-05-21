@@ -101,43 +101,48 @@ module.exports = function (app, db) {
     try {
       const { email, page, count = 10 } = req.params;
       if (!email) {
-        return res.status(400).json("Please provide valid parameters e.g email");
+        return res
+          .status(400)
+          .json("Please provide valid parameters e.g email");
       }
-  
+
       const budgetRef = budgets;
       const txnRef = txns;
-  
+
       // Get budget IDs
       const queryOutput = await budgetRef
         .where("users", "array-contains", email)
         .where("status", "==", "active")
         .get();
-  
+
       if (queryOutput.empty) {
         return res.status(200).json({ txns: [], max: null, count: 0 });
       }
-  
+
       const budgetIds = queryOutput.docs.map((doc) => doc.id);
-  
+
       // Get max transaction amount
       const maxRef = await txnRef
         .where("budgetId", "in", budgetIds)
         .orderBy("amount", "desc")
         .limit(1)
         .get();
-  
+
       const max = maxRef.empty ? null : maxRef.docs[0].data().amount;
-  
+
       // Get total transaction count
-      const countRef = await txnRef.where("budgetId", "in", budgetIds).count().get();
+      const countRef = await txnRef
+        .where("budgetId", "in", budgetIds)
+        .count()
+        .get();
       const totalCount = countRef.data().count;
-  
+
       // Get transactions
       const txnQuery = txnRef
         .where("budgetId", "in", budgetIds)
         .orderBy("date", "desc")
         .limit(Number(count));
-  
+
       let queryOutput2;
       if (page > 1) {
         const firstSnapshot = await txnQuery.get();
@@ -154,9 +159,12 @@ module.exports = function (app, db) {
       } else {
         queryOutput2 = await txnQuery.get();
       }
-  
-      const txnArray = queryOutput2.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
-  
+
+      const txnArray = queryOutput2.docs.map((doc) => ({
+        id: doc.id,
+        data: doc.data(),
+      }));
+
       res.status(200).json({ txns: txnArray, max, count: totalCount });
     } catch (error) {
       console.error(error);
@@ -281,8 +289,43 @@ module.exports = function (app, db) {
     if (!doc.exists) {
       res.status(200).json("No such txn found!");
     } else {
-      console.log("txn data:", doc.data());
       res.status(200).json(doc.data());
+    }
+  });
+
+  /**
+   * @swagger
+   * '/txn/{id}':
+   *  get:
+   *     tags:
+   *        - Manage Transactions
+   *     summary: delete txn by id
+   *     parameters:
+   *      - name: id
+   *        in: path
+   *        description: The id of the txn
+   *        required: true
+   *        type: string
+   *     responses:
+   *      200:
+   *        description: Deleted Successfully
+   *      500:
+   *        description: Internal Server Error
+   */
+
+  app.delete("/txn/:id", async (req, res) => {
+    try {
+      const txnId = req.params.id;
+      const txnRef = txns.doc(txnId);
+      await txnRef.delete();
+      res.status(200).json("Txn Deleted");
+    } catch (error) {
+      if (error.code === "NOT_FOUND") {
+        res.status(404).json("No such txn found!");
+      } else {
+        console.error(error);
+        res.status(500).json("Internal Server Error");
+      }
     }
   });
 
@@ -340,7 +383,7 @@ module.exports = function (app, db) {
         date: req.body.date,
         createdBy: req.body.user,
         budgetId: req.body.budgetId,
-        label: req.body.label
+        label: req.body.label,
       },
       { merge: true }
     );
@@ -369,53 +412,69 @@ module.exports = function (app, db) {
 
   app.get("/txn/spent/:email", async (req, res) => {
     const txnRef = txns;
+    const budgetRef = budgets;
     const responseMessage = "No matching transaction found.";
     const email = req.params.email;
-  
+
     if (!email || email === "") {
       res.status(400).json("Please provide a valid 'email' parameter");
       return;
     }
-  
+
+    const budgetFind = await budgetRef
+      .where("users", "array-contains", email)
+      .where("status", "==", "active")
+      .get();
+
+    if (budgetFind.empty) {
+      res.status(400).json("No budget found for user");
+      return;
+    }
+
+    const budgetIds = budgetFind.docs.map((doc) => doc.id);
+
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0); // Start of today
-  
+
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999); // End of today
-  
+
     const weekStart = getStartOfWeek(new Date());
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
     weekEnd.setHours(23, 59, 59, 999); // End of the week
-  
-    const queryOutput = await txnRef.where("createdBy", "==", email).get();
-  
+
+    const queryOutput = await txnRef
+      .where("createdBy", "==", email)
+      .where("budgetId", "in", budgetIds)
+      .get();
+
     if (queryOutput.empty) {
       res.status(200).json(responseMessage);
       return;
     }
-  
+
     let totalAmountToday = 0;
     let totalAmountThisWeek = 0;
-  
+
     queryOutput.forEach((doc) => {
       const txnData = doc.data();
       const txnDate = new Date(txnData.date);
-    
+
       if (txnDate >= todayStart && txnDate <= todayEnd) {
         totalAmountToday += txnData.amount;
       }
-  
+
       if (txnDate >= weekStart && txnDate <= weekEnd) {
         totalAmountThisWeek += txnData.amount;
       }
     });
-  
+
     const response = {
       totalAmountToday,
       totalAmountThisWeek,
     };
-  
+
     res.status(200).json(response);
   });
 
@@ -745,7 +804,7 @@ module.exports = function (app, db) {
         result = {
           datesData: sortedData,
           categoryTxnCount: categoryTxnCount,
-          labelTxnCount: labelTxnCount
+          labelTxnCount: labelTxnCount,
         };
       }
       res.status(200).json(result);
@@ -783,7 +842,7 @@ module.exports = function (app, db) {
       .get();
     if (!queryOutput.empty) {
       for (let label of queryOutput.docs) {
-        array = label.data().tags != null ? label.data().tags: [];
+        array = label.data().tags != null ? label.data().tags : [];
       }
     }
     res.status(200).json(array);
