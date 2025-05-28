@@ -212,59 +212,63 @@ module.exports = function (app, db) {
    *
    */
   app.post("/txn/filter", async (req, res) => {
-    var txnArray = [];
-    const budgetRef = budgets;
-    const txnRef = txns;
-    const email = req.body.email;
-    const categories = req.body.categories;
-    const labels = req.body.labels;
-    const min = req.body.min;
-    const max = req.body.max;
+    try {
+      const { email, categories, labels, min, max } = req.body;
 
-    const snapshot = await budgetRef.get();
-
-    if (email) {
-      if (!snapshot.empty) {
-        const queryOutput = await budgetRef
-          .where("users", "array-contains", email)
-          .where("status", "==", "active")
-          .get();
-        const budgetIds = [];
-        if (!queryOutput.empty) {
-          queryOutput.forEach((doc) => {
-            budgetIds.push(doc.id);
-          });
-        }
-
-        let query = txnRef.where("budgetId", "in", budgetIds);
-
-        if (categories && categories.length > 0) {
-          query = query.where("category", "in", categories);
-        }
-
-        if (labels && labels.length > 0) {
-          query = query.where("label", "in", labels);
-        }
-
-        if (min) {
-          query = query.where("amount", ">=", Number(min));
-        }
-        if (max) {
-          query = query.where("amount", "<=", Number(max));
-        }
-
-        const queryOutput2 = await query.get();
-        if (!queryOutput2.empty) {
-          queryOutput2.forEach((doc) => {
-            txnArray.push({ id: doc.id, data: doc.data() });
-          });
-        }
-        res.status(200).json(txnArray);
-      } else {
-        res.status(200).json(txnArray);
+      // Early validation
+      if (!email) {
+        return res
+          .status(400)
+          .json({ error: "Please provide valid parameters e.g email" });
       }
-    } else {
-      res.status(400).json("Please provide valid parameters e.g email");
+
+      // Step 1: Get budget IDs for the user in a single optimized query
+      const budgetQuery = budgets
+        .where("users", "array-contains", email)
+        .where("status", "==", "active")
+        .select(); // Only fetch document IDs, not full data
+
+      const budgetSnapshot = await budgetQuery.get();
+
+      if (budgetSnapshot.empty) {
+        return res.status(200).json([]);
+      }
+
+      const budgetIds = budgetSnapshot.docs.map((doc) => doc.id);
+
+      // Step 2: Build transaction query with all filters
+      let txnQuery = txns.where("budgetId", "in", budgetIds);
+
+      // Apply filters conditionally
+      if (categories?.length > 0) {
+        txnQuery = txnQuery.where("category", "in", categories);
+      }
+
+      if (labels?.length > 0) {
+        txnQuery = txnQuery.where("label", "in", labels);
+      }
+
+      if (min !== undefined && min !== null) {
+        txnQuery = txnQuery.where("amount", ">=", Number(min));
+      }
+
+      if (max !== undefined && max !== null) {
+        txnQuery = txnQuery.where("amount", "<=", Number(max));
+      }
+
+      // Step 3: Execute transaction query
+      const txnSnapshot = await txnQuery.get();
+
+      // Step 4: Transform results efficiently
+      const txnArray = txnSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        data: doc.data(),
+      }));
+
+      res.status(200).json(txnArray);
+    } catch (error) {
+      console.error("Filter API Error:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
