@@ -3,11 +3,13 @@ const bodyParser = require("body-parser");
 const app = express();
 const cors = require("cors");
 const port = process.env.PORT || 8000;
+const compression = require('compression');
 const corsOptions = {
   origin: ["https://moneywiseapp.vercel.app/", "http://localhost:4200"],
   credentials: true,
   optionSuccessStatus: 200,
 };
+app.use(compression());
 app.use(cors(corsOptions));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
