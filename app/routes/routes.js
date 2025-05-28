@@ -217,6 +217,7 @@ module.exports = function (app, db) {
     const txnRef = txns;
     const email = req.body.email;
     const categories = req.body.categories;
+    const labels = req.body.labels;
     const min = req.body.min;
     const max = req.body.max;
 
@@ -240,6 +241,11 @@ module.exports = function (app, db) {
         if (categories && categories.length > 0) {
           query = query.where("category", "in", categories);
         }
+
+        if (labels && labels.length > 0) {
+          query = query.where("label", "in", labels);
+        }
+
         if (min) {
           query = query.where("amount", ">=", Number(min));
         }
@@ -590,6 +596,7 @@ module.exports = function (app, db) {
       createdBy: req.body.createdBy,
       users: [req.body.createdBy],
       status: req.body.status,
+      createdDate: new Date(),
     });
     res.status(200).json("create success");
   });
