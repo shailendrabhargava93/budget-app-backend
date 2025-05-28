@@ -4,7 +4,7 @@ const app = express();
 const cors = require("cors");
 const port = process.env.PORT || 8000;
 const corsOptions = {
-  origin: ["https://money-wise-web.vercel.app/", "http://localhost:4200"],
+  origin: ["https://moneywiseapp.vercel.app/", "http://localhost:4200"],
   credentials: true,
   optionSuccessStatus: 200,
 };
